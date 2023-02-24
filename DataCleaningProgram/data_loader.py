@@ -1,31 +1,35 @@
-from datetime import datetime
-from parser import ParserError
-
 import pandas as pd
-from tabulate import tabulate
-import numpy as np
+from parser import ParserError
 
 
 class DataLoader():
     def __init__(self,
-                 input='C:/Users/Ania/Desktop/Nestle Case/X_train_T2.csv',
-                 sep=';',
-                 coefficient_nulls_removal=10,
-                 date_column_name= 1,
-                 date_format="%d-%m-%Y"):
+                 coefficient_nulls_removal=50,
+                 date_column_name=('Date','Old Date'),
+                 date_format="%d-%m-%Y",
+                 must_have_attr=("year", "month", "day"),
+                 datetime_duplicated_column_name=('Date_Duplicated', 'Old Date_Duplicated'),
+                 multi_index_columns=('Students', 'Subjects'),
+                 date_duplicate_column_name=('Date_Duplicated', 'Old Date_Duplicated')
+                 ):
 
-        self.input = input
-        self.sep = sep
-        self.initial_data = pd.read_csv(input, sep)
         self.date_format = date_format
         self.coefficient_nulls_removal = coefficient_nulls_removal
         self.date_column_name = date_column_name
+        self.must_have_attr = must_have_attr
+        self.datetime_duplicated_column_name = datetime_duplicated_column_name
+        self.multi_index_columns = multi_index_columns
+        self.date_duplicate_column_name = date_duplicate_column_name
 
     def get_initial_data(self):
         """
          Returns initial data for further clean-up
         """
-        return self.initial_data
+        input_data_path: str = 'C:/Users/Ania/Desktop/Students1.csv'
+        sep = ';'
+        index_col = []
+        initial_data = pd.read_csv(input_data_path, sep, index_col=index_col)
+        return initial_data
 
     def remove_missing_data(self, data):
         """
@@ -34,7 +38,6 @@ class DataLoader():
         E.g. if coefficient_nulls removal is equal to 50, it means that all columns with missing data
         equal or bigger than 50% will be removed
         """
-        data = data.copy()
         print(f'Check nulls before\n{data.isnull().sum()}')
 
         to_remove = []
@@ -50,15 +53,15 @@ class DataLoader():
         """
         returns list of duplicated columns. When column names are duplicated, DataFrame creates
         duplicate by adding "." and number, e.g. 1. That is why we can distinguish duplicates by eliminating names with "."
+        Currently, the code works only when names of columns do not contain dot ".". If more complicated naming occurs,
+        this method will be adjusted
         """
-        data = data.copy()
         non_duplicate_columns_names = set()
         duplicate_columns_names = set()
 
         index = 0
 
-        for column in data:
-            len_before = len(non_duplicate_columns_names)
+        for column in data.columns:
             if '.' not in column:
                 non_duplicate_columns_names.add(column)
             else:
@@ -70,78 +73,87 @@ class DataLoader():
         """
         removes duplicated columns using list of duplicated columns names
         """
-        data = data.copy()
         duplicate_columns_names = self.indicate_duplicated_columns(data)
         data = data.drop(columns=duplicate_columns_names, axis=1)
         return data
 
-    def check_if_multi_index(self, data):
+    def handle_multi_index(self, data):
         """
-        return True if DataFrame is MutiIndex or False if is not
+        return True if DataFrame is MultiIndex or False if is not
+        TODO:zamienić na zwykly indeks dorobić tę część, gdzie okazuje się, że dane są multiindeksowe
         """
-        data = data.copy()
+
         if isinstance(data.index, pd.MultiIndex):
-            print('Data is MultiIndex')
-            return True
+            data = data.reset_index(self.multi_index_columns)
+            print(data)
+            return data
         else:
-            print('Data is NOT MultiIndex')
-            return False
+            return data
+
 
     def delete_duplicated_rows(self, data):
         """
         If data is not MultiIndex delete it automatically
         """
-        data = data.copy()
-        multi_index = self.check_if_multi_index(data)
 
-        if multi_index == False:
-            data = data.drop_duplicates(keep='first')
-            print(data)
-        else:
-            data = data
-            print("Check your MultiIndex data")
-        # print(tabulate(data, headers='keys'))
+        data = data.drop_duplicates(keep='first')
         return data
 
     def parse_dates(self, data):
         """
-        Parsing dates into DateTime mode. Version iterating by columns and rows
+         Parse dates into DateTime format
         """
-        for row in range(1, len(data)):
-            for self.date_column in range(1, len(data.columns)):
-                try:
-                    data.iat[row, self.date_column] = datetime.strptime(data.iat[row, self.date_column],
-                                                                        self.date_format).date()
-                except (ParserError, TypeError, ValueError):
-                    pass
+
+        try:
+            for date_column in self.date_column_name:
+                data[date_column] = pd.to_datetime(data[date_column], errors='coerce')
+
+        except ParserError as e:
+            print(e)
+            pass
+        except ValueError as e:
+            print(e)
+            pass
+
+        return data
+
+    def format_date(self, data):
+        """
+        Change default DateTime format into desired format. Returns date type as object.
+        This type of date will be necessary for visualization. DateTime type will be needed for analysis
+
+        """
+
+        for date_column in self.date_column_name:
+            data[date_column] = data[date_column].dt.strftime(self.date_format)
+
+
+        print(data)
+        return data
+
+    def add_datetime_columns(self, data):
+        """
+        Add duplicate date columns with datetime format to ease further analyses
+        "Format_date" function changes type of date from datetime into string: helpful for visualization, not helpful for analyses
+        """
+        for (col_name, duplicate_datetime_col) in zip(self.date_column_name, self.datetime_duplicated_column_name):
+            data[duplicate_datetime_col] = data.loc[:, col_name]
+            data[duplicate_datetime_col] = pd.to_datetime(data[duplicate_datetime_col], errors='coerce')
+
+        print(data)
         data.info()
         return data
 
-    def parse_dates1(self, data):
-
-        data = data.copy()
-        #pd.read_csv('data/data_3.csv', parse_dates=['date']) -pomysł od Natana
-        #poczytać o funkcji apply i map - dla obliczenia efektywnego df.apply(np.sqrt),
-        # zamiast pierwiastka mogę podać swoją funkcję
-
-        custom_date_parser = lambda x: datetime.strptime(x, self.date_format)
-        data = pd.read_csv(data, parse_dates=[self.date_column_name], date_parser=custom_date_parser)
-        data.info()
-        return data
-
-    # def invoke_parse_data(self, data):
-    #     data = data.copy()
-    #     data.apply(np.parse_dates())
-    #     return data
-    #
 
 if __name__ == '__main__':
     dl = DataLoader()
-    modified_data_1 = dl.remove_missing_data(dl.get_initial_data())
-    modified_data_2 = dl.indicate_duplicated_columns(modified_data_1)
-    modified_data_3 = dl.remove_duplicated_columns(modified_data_1)
-    modified_data_3 = dl.delete_duplicated_rows(modified_data_3)
-    modified_data_4 = dl.parse_dates1(modified_data_3)
-    # modified_data_5 = dl.invoke_parse_data(modified_data_4)
+    data_missing = dl.remove_missing_data(dl.get_initial_data())
+    data_duplicate_cols = dl.indicate_duplicated_columns(data_missing )
+    data_remove_duplicate_cols = dl.remove_duplicated_columns(data_missing)
+    data_remove_duplicate_rows = dl.delete_duplicated_rows(data_remove_duplicate_cols)
+    data_flat_multi_index = dl.handle_multi_index(data_remove_duplicate_rows)
+    data_parse_dates = dl.parse_dates(data_flat_multi_index)
+    data_format_dates = dl.format_date(data_parse_dates)
+    data_add_datetime_cols = dl.add_datetime_columns(data_format_dates)
 
-
+    #data_clean = dl.remove_ouliers(data.copy()) - odpalanie na kopii dla bezpieczeństwa
