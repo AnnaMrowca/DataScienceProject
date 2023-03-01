@@ -1,18 +1,24 @@
 import pandas as pd
 from parser import ParserError
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 class DataLoader():
     def __init__(self,
+                 input_data_path: str = 'C:/Users/Ania/Desktop/Students1.csv',
+                 sep = ';',
                  coefficient_nulls_removal=50,
                  date_column_name=('Date','Old Date'),
                  date_format="%d-%m-%Y",
                  must_have_attr=("year", "month", "day"),
                  datetime_duplicated_column_name=('Date_Duplicated', 'Old Date_Duplicated'),
                  multi_index_columns=('Students', 'Subjects'),
-                 date_duplicate_column_name=('Date_Duplicated', 'Old Date_Duplicated')
+                 date_duplicate_column_name=('Date_Duplicated', 'Old Date_Duplicated'),
+                 outliers_columns = ('Age')
                  ):
-
+        self.input_data_path = input_data_path
+        self.sep = sep
         self.date_format = date_format
         self.coefficient_nulls_removal = coefficient_nulls_removal
         self.date_column_name = date_column_name
@@ -20,15 +26,16 @@ class DataLoader():
         self.datetime_duplicated_column_name = datetime_duplicated_column_name
         self.multi_index_columns = multi_index_columns
         self.date_duplicate_column_name = date_duplicate_column_name
+        self.outliers_columns = outliers_columns
+
 
     def get_initial_data(self):
         """
          Returns initial data for further clean-up
         """
-        input_data_path: str = 'C:/Users/Ania/Desktop/Students1.csv'
-        sep = ';'
+
         index_col = []
-        initial_data = pd.read_csv(input_data_path, sep, index_col=index_col)
+        initial_data = pd.read_csv(self.input_data_path, self.sep, index_col=index_col)
         return initial_data
 
     def remove_missing_data(self, data):
@@ -144,6 +151,45 @@ class DataLoader():
         data.info()
         return data
 
+    def outliers_standard_deviation(self, data):
+
+        """
+        Check for outliers laying outside of 3 times standard deviation. Add to anomalies folder for review
+        """
+
+        anomalies = []
+        data_std = np.std(data[self.outliers_columns])
+        data_mean = np.mean(data[self.outliers_columns])
+        anomaly_cut_off = data_std * 3
+
+        lower_limit = data_mean - anomaly_cut_off
+        upper_limit = data_mean + anomaly_cut_off
+        print(lower_limit)
+
+        for value in data[self.outliers_columns]:
+            if value > upper_limit or value < lower_limit:
+                anomalies.append(value)
+
+        print(anomalies)
+        return anomalies
+
+    def outliers_find_iqr(self, data):
+
+        """
+        Selects only data with q1 and q3.
+        IQR is the difference between the third quartile and the first quartile (IQR = Q3 -Q1).
+        Outliers in this case are defined as the observations that are below (Q1 − 1.5x IQR)
+        or boxplot lower whisker or above (Q3 + 1.5x IQR) or boxplot upper whisker
+        """
+
+        q3 = data[self.outliers_columns].quantile(.75)
+        q1 = data[self.outliers_columns].quantile(.25)
+        mask = data[self.outliers_columns].between(q1, q3, inclusive=True)
+        print(mask)
+        iqr = data.loc[mask, [self.outliers_columns]]
+        print(iqr)
+        return iqr
+
 
 if __name__ == '__main__':
     dl = DataLoader()
@@ -155,5 +201,7 @@ if __name__ == '__main__':
     data_parse_dates = dl.parse_dates(data_flat_multi_index)
     data_format_dates = dl.format_date(data_parse_dates)
     data_add_datetime_cols = dl.add_datetime_columns(data_format_dates)
+    outliers_std_dev = dl.outliers_standard_deviation(data_parse_dates)
+    data_find_iqr = dl.outliers_find_iqr(data_parse_dates)
 
     #data_clean = dl.remove_ouliers(data.copy()) - odpalanie na kopii dla bezpieczeństwa
