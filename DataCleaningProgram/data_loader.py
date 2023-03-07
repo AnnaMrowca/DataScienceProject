@@ -7,15 +7,15 @@ import matplotlib.pyplot as plt
 class DataLoader():
     def __init__(self,
                  input_data_path: str = 'C:/Users/Ania/Desktop/Students1.csv',
-                 sep = ';',
+                 sep=';',
                  coefficient_nulls_removal=50,
-                 date_column_name=('Date','Old Date'),
+                 date_column_name=('Date', 'Old Date'),
                  date_format="%d-%m-%Y",
                  must_have_attr=("year", "month", "day"),
                  datetime_duplicated_column_name=('Date_Duplicated', 'Old Date_Duplicated'),
                  multi_index_columns=('Students', 'Subjects'),
                  date_duplicate_column_name=('Date_Duplicated', 'Old Date_Duplicated'),
-                 outliers_columns = ('Age')
+                 outliers_columns=('Age', 'Control')
                  ):
         self.input_data_path = input_data_path
         self.sep = sep
@@ -27,7 +27,6 @@ class DataLoader():
         self.multi_index_columns = multi_index_columns
         self.date_duplicate_column_name = date_duplicate_column_name
         self.outliers_columns = outliers_columns
-
 
     def get_initial_data(self):
         """
@@ -97,7 +96,6 @@ class DataLoader():
         else:
             return data
 
-
     def delete_duplicated_rows(self, data):
         """
         If data is not MultiIndex delete it automatically
@@ -134,7 +132,6 @@ class DataLoader():
         for date_column in self.date_column_name:
             data[date_column] = data[date_column].dt.strftime(self.date_format)
 
-
         print(data)
         return data
 
@@ -154,47 +151,63 @@ class DataLoader():
     def outliers_standard_deviation(self, data):
 
         """
-        Check for outliers laying outside of 3 times standard deviation. Add to anomalies folder for review
+        This function adds additional boolean columns to help detect outliers.
+        If value is an outlier it shows "True" if not - "False".
+        Outliers lay outside 3 times standard deviation.
         """
 
-        anomalies = []
-        data_std = np.std(data[self.outliers_columns])
-        data_mean = np.mean(data[self.outliers_columns])
-        anomaly_cut_off = data_std * 3
+        for column in self.outliers_columns:
+            outlier = []
+            data_std = np.std(data[column])
+            data_mean = np.mean(data[column])
+            anomaly_cut_off = data_std * 3
 
-        lower_limit = data_mean - anomaly_cut_off
-        upper_limit = data_mean + anomaly_cut_off
-        print(lower_limit)
+            lower_limit = data_mean - anomaly_cut_off
+            upper_limit = data_mean + anomaly_cut_off
+            print(lower_limit)
 
-        for value in data[self.outliers_columns]:
-            if value > upper_limit or value < lower_limit:
-                anomalies.append(value)
+            #TODO: refactor from for loop to apply function for code efficiency
 
-        print(anomalies)
-        return anomalies
+            for value in data[column]:
+                outlier.append(value > upper_limit or value < lower_limit)
+
+            data['Outlier ' + column] = outlier
+
+        print(data)
+        return data
 
     def outliers_find_iqr(self, data):
 
         """
-        Selects only data with q1 and q3.
+        This function adds additional boolean columns to help detect outliers.
+        If value is an outlier it shows "True" if not - "False".
         IQR is the difference between the third quartile and the first quartile (IQR = Q3 -Q1).
         Outliers in this case are defined as the observations that are below (Q1 − 1.5x IQR)
-        or boxplot lower whisker or above (Q3 + 1.5x IQR) or boxplot upper whisker
+        or boxplot lower whisker or above (Q3 + 1.5x IQR) or boxplot upper whisker.
+
         """
 
-        q3 = data[self.outliers_columns].quantile(.75)
-        q1 = data[self.outliers_columns].quantile(.25)
-        mask = data[self.outliers_columns].between(q1, q3, inclusive=True)
-        print(mask)
-        iqr = data.loc[mask, [self.outliers_columns]]
-        print(iqr)
-        return iqr
+        for column in self.outliers_columns:
+            outlier = []
+            q3 = data[column].quantile(.75)
+            q1 = data[column].quantile(.25)
+            iqr = q3-q1
+            outlier_step = 1.5 * iqr
+
+            # TODO: refactor from for loop to apply function for code efficiency
+
+            for value in data[column]:
+                outlier.append(value < q1 - outlier_step or value > q3 + outlier_step)
+
+            data['Outlier ' + column] = outlier
+            print(data)
+            return data
 
 
 if __name__ == '__main__':
     dl = DataLoader()
     data_missing = dl.remove_missing_data(dl.get_initial_data())
-    data_duplicate_cols = dl.indicate_duplicated_columns(data_missing )
+    data_duplicate_cols = dl.indicate_duplicated_columns(data_missing)
     data_remove_duplicate_cols = dl.remove_duplicated_columns(data_missing)
     data_remove_duplicate_rows = dl.delete_duplicated_rows(data_remove_duplicate_cols)
     data_flat_multi_index = dl.handle_multi_index(data_remove_duplicate_rows)
@@ -204,4 +217,4 @@ if __name__ == '__main__':
     outliers_std_dev = dl.outliers_standard_deviation(data_parse_dates)
     data_find_iqr = dl.outliers_find_iqr(data_parse_dates)
 
-    #data_clean = dl.remove_ouliers(data.copy()) - odpalanie na kopii dla bezpieczeństwa
+    # data_clean = dl.remove_ouliers(data.copy()) - odpalanie funkcji na kopii dla bezpieczeństwa
