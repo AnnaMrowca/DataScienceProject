@@ -1,25 +1,27 @@
 import pandas as pd
 from parser import ParserError
 import numpy as np
-import matplotlib.pyplot as plt
+
 
 
 class DataLoader():
     def __init__(self,
-                 input_data_path: str = 'C:/Users/Ania/Desktop/Students1.csv',
-                 sep=';',
+                 input_data_path: str,
+                 sep=',',
+                 decimal='.',
+                 csv_format: str = '',
                  coefficient_nulls_removal=50,
-                 date_column_name=('Date', 'Old Date'),
-                 date_format="%d-%m-%Y",
+                 date_column_name=[],
                  must_have_attr=("year", "month", "day"),
-                 datetime_duplicated_column_name=('Date_Duplicated', 'Old Date_Duplicated'),
-                 multi_index_columns=('Students', 'Subjects'),
-                 date_duplicate_column_name=('Date_Duplicated', 'Old Date_Duplicated'),
-                 outliers_columns=('Age', 'Control')
+                 datetime_duplicated_column_name=['date_Duplicated'],
+                 multi_index_columns=(),
+                 date_duplicate_column_name=(),
+                 outliers_columns=[],
                  ):
         self.input_data_path = input_data_path
         self.sep = sep
-        self.date_format = date_format
+        self.decimal = decimal
+        self.csv_format = csv_format
         self.coefficient_nulls_removal = coefficient_nulls_removal
         self.date_column_name = date_column_name
         self.must_have_attr = must_have_attr
@@ -29,20 +31,29 @@ class DataLoader():
         self.outliers_columns = outliers_columns
 
     def get_initial_data(self):
-        """
-         Returns initial data for further clean-up
-        """
 
-        index_col = []
-        initial_data = pd.read_csv(self.input_data_path, self.sep, index_col=index_col)
-        return initial_data
+        """
+         This function returns initial data for further clean-up.
+         If dataset is has txt extension, it turns it into csv.
+
+        """
+        if self.input_data_path.endswith('txt'):
+            initial_data = pd.read_csv(self.input_data_path)
+            initial_data.to_csv(self.csv_format, header=None, index=False, sep=self.sep, decimal=self.decimal)
+            return initial_data
+        else:
+            index_col = []
+            initial_data = pd.read_csv(self.input_data_path, sep=self.sep, decimal=self.decimal, index_col=index_col)
+            return initial_data
 
     def remove_missing_data(self, data):
+
         """
-        Checks initial state of nulls. Next, it zips column name with sum of nulls.
+        This function checks initial state of nulls. Next, it zips column name with sum of nulls.
         If percentage of sum of nulls is bigger than coefficient_nulls_removal the data is removed.
-        E.g. if coefficient_nulls removal is equal to 50, it means that all columns with missing data
-        equal or bigger than 50% will be removed
+        E.g. if coefficient_nulls removal is equal to 50.
+        It means that if column does not have 50% or more data it will be removed
+
         """
         print(f'Check nulls before\n{data.isnull().sum()}')
 
@@ -56,11 +67,13 @@ class DataLoader():
         return data
 
     def indicate_duplicated_columns(self, data):
+
         """
-        returns list of duplicated columns. When column names are duplicated, DataFrame creates
+        This function returns list of duplicated columns. When column names are duplicated, DataFrame creates
         duplicate by adding "." and number, e.g. 1. That is why we can distinguish duplicates by eliminating names with "."
-        Currently, the code works only when names of columns do not contain dot ".". If more complicated naming occurs,
-        this method will be adjusted
+        Currently, the code works only when names of columns do not contain dot - ".". If more complicated naming occurs,
+        this function needs to be adjusted
+
         """
         non_duplicate_columns_names = set()
         duplicate_columns_names = set()
@@ -76,17 +89,21 @@ class DataLoader():
         return list(duplicate_columns_names)
 
     def remove_duplicated_columns(self, data):
+
         """
-        removes duplicated columns using list of duplicated columns names
+        This function removes duplicated columns using list of duplicated columns names
+
         """
+
         duplicate_columns_names = self.indicate_duplicated_columns(data)
         data = data.drop(columns=duplicate_columns_names, axis=1)
         return data
 
     def handle_multi_index(self, data):
+
         """
-        return True if DataFrame is MultiIndex or False if is not
-        TODO:zamienić na zwykly indeks dorobić tę część, gdzie okazuje się, że dane są multiindeksowe
+        This function returns True if DataFrame is MultiIndex or False if is not
+        
         """
 
         if isinstance(data.index, pd.MultiIndex):
@@ -94,19 +111,24 @@ class DataLoader():
             print(data)
             return data
         else:
+            print('File is not a multiindex')
             return data
 
     def delete_duplicated_rows(self, data):
+
         """
-        If data is not MultiIndex delete it automatically
+        This function drops duplicated rows, keeping records that show up first in the dataset
+
         """
 
         data = data.drop_duplicates(keep='first')
         return data
 
     def parse_dates(self, data):
+
         """
-         Parse dates into DateTime format
+         This function parses dates into DateTime format
+
         """
 
         try:
@@ -122,7 +144,8 @@ class DataLoader():
 
         return data
 
-    def format_date(self, data):
+    def format_date(self, data, date_format):
+
         """
         Change default DateTime format into desired format. Returns date type as object.
         This type of date will be necessary for visualization. DateTime type will be needed for analysis
@@ -130,22 +153,8 @@ class DataLoader():
         """
 
         for date_column in self.date_column_name:
-            data[date_column] = data[date_column].dt.strftime(self.date_format)
+            data[f"{date_column}_{date_format}"] = data[date_column].dt.strftime(date_format)
 
-        print(data)
-        return data
-
-    def add_datetime_columns(self, data):
-        """
-        Add duplicate date columns with datetime format to ease further analyses
-        "Format_date" function changes type of date from datetime into string: helpful for visualization, not helpful for analyses
-        """
-        for (col_name, duplicate_datetime_col) in zip(self.date_column_name, self.datetime_duplicated_column_name):
-            data[duplicate_datetime_col] = data.loc[:, col_name]
-            data[duplicate_datetime_col] = pd.to_datetime(data[duplicate_datetime_col], errors='coerce')
-
-        print(data)
-        data.info()
         return data
 
     def outliers_standard_deviation(self, data):
@@ -157,6 +166,8 @@ class DataLoader():
         """
 
         for column in self.outliers_columns:
+            if column not in data.columns:
+                continue
             outlier = []
             data_std = np.std(data[column])
             data_mean = np.mean(data[column])
@@ -166,14 +177,12 @@ class DataLoader():
             upper_limit = data_mean + anomaly_cut_off
             print(lower_limit)
 
-            #TODO: refactor from for loop to apply function for code efficiency
 
             for value in data[column]:
                 outlier.append(value > upper_limit or value < lower_limit)
 
-            data['Outlier ' + column] = outlier
+            data['STD_DEV_Outlier' + '_'+ column] = outlier
 
-        print(data)
         return data
 
     def outliers_find_iqr(self, data):
@@ -188,33 +197,68 @@ class DataLoader():
         """
 
         for column in self.outliers_columns:
+            if column not in data.columns:
+                continue
             outlier = []
             q3 = data[column].quantile(.75)
             q1 = data[column].quantile(.25)
             iqr = q3-q1
             outlier_step = 1.5 * iqr
 
-            # TODO: refactor from for loop to apply function for code efficiency
 
             for value in data[column]:
                 outlier.append(value < q1 - outlier_step or value > q3 + outlier_step)
 
-            data['Outlier ' + column] = outlier
-            print(data)
+            data['IQR_Outlier' + '_'+ column] = outlier
             return data
 
+    def fill_in_outliers_with_nan(self, data, method):
+
+        """
+        This function fills in NaN for column's values which are outliers.
+        It iterates by columns, locates them and checks if they are outliers.
+        Next, it locates columns where values are to be filled in with NaN
+
+        """
+
+        for column in data.columns:
+            if f"{method}_Outlier_{column}" in data.columns:
+                data.loc[data[f"{method}_Outlier_{column}"] == True, column] = np.nan
+
+        return data
+
+    def outliers_fill_in_interpolation(self, data):
+
+        """
+        This function fill in outliers, using method "pad", which is one of basic solutions
+        Filling in outliers should be resolved case by case as it highly depends on quality of data.
+
+        """
+
+        data = data.interpolate(method='pad', limit_direction='forward')
+        return data
 
 if __name__ == '__main__':
-    dl = DataLoader()
-    data_missing = dl.remove_missing_data(dl.get_initial_data())
-    data_duplicate_cols = dl.indicate_duplicated_columns(data_missing)
-    data_remove_duplicate_cols = dl.remove_duplicated_columns(data_missing)
-    data_remove_duplicate_rows = dl.delete_duplicated_rows(data_remove_duplicate_cols)
-    data_flat_multi_index = dl.handle_multi_index(data_remove_duplicate_rows)
-    data_parse_dates = dl.parse_dates(data_flat_multi_index)
-    data_format_dates = dl.format_date(data_parse_dates)
-    data_add_datetime_cols = dl.add_datetime_columns(data_format_dates)
-    outliers_std_dev = dl.outliers_standard_deviation(data_parse_dates)
-    data_find_iqr = dl.outliers_find_iqr(data_parse_dates)
+    dl = DataLoader(input_data_path='C:/Users/Ania/Desktop/Nestle Case/X_train_T2.csv',
+                    sep=';',
+                    decimal=',',
+                    coefficient_nulls_removal=50,
+                    date_column_name=['date'],
+                    outliers_columns=['channel_2','channel_15','channel_17', 'channel_18',
+                                   'channel_20','channel_29','channel_43','channel_45',
+                                   'channel_52','channel_57','channel_75','channel_89',
+                                   'channel_95','channel_101','channel_111'])
+    data = dl.get_initial_data()
+    data = dl.remove_missing_data(data)
+    data = dl.remove_duplicated_columns(data)
+    data = dl.delete_duplicated_rows(data)
+    data = dl.handle_multi_index(data)
+    data = dl.parse_dates(data)
+    data = dl.format_date(data, date_format='%d-%m-%Y')
+    data = dl.outliers_standard_deviation(data)
+    data = dl.outliers_find_iqr(data)
+    data = dl.fill_in_outliers_with_nan(data, method='STD_DEV')
+    data= dl.outliers_fill_in_interpolation(data)
 
-    # data_clean = dl.remove_ouliers(data.copy()) - odpalanie funkcji na kopii dla bezpieczeństwa
+
+
