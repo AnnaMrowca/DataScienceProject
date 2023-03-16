@@ -7,24 +7,22 @@ import numpy as np
 class DataLoader():
     def __init__(self,
                  input_data_path: str,
-                 sep=',',
-                 decimal='.',
-                 csv_format: str = '',
-                 coefficient_nulls_removal=50,
-                 date_column_name=[],
-                 must_have_attr=("year", "month", "day"),
-                 datetime_duplicated_column_name=['date_Duplicated'],
-                 multi_index_columns=(),
-                 date_duplicate_column_name=(),
-                 outliers_columns=[],
+                 sep: str = ',',
+                 decimal: str = '.',
+                 csv_format_path: str = ' ',
+                 coefficient_nulls_removal: int = 50,
+                 date_column_name: list = [],
+                 datetime_duplicated_column_name: list = [],
+                 multi_index_columns: list = [],
+                 date_duplicate_column_name: list =[],
+                 outliers_columns: list =[],
                  ):
         self.input_data_path = input_data_path
         self.sep = sep
         self.decimal = decimal
-        self.csv_format = csv_format
+        self.csv_format_path = csv_format_path
         self.coefficient_nulls_removal = coefficient_nulls_removal
         self.date_column_name = date_column_name
-        self.must_have_attr = must_have_attr
         self.datetime_duplicated_column_name = datetime_duplicated_column_name
         self.multi_index_columns = multi_index_columns
         self.date_duplicate_column_name = date_duplicate_column_name
@@ -39,7 +37,7 @@ class DataLoader():
         """
         if self.input_data_path.endswith('txt'):
             initial_data = pd.read_csv(self.input_data_path)
-            initial_data.to_csv(self.csv_format, header=None, index=False, sep=self.sep, decimal=self.decimal)
+            initial_data.to_csv(self.csv_format_path, header=None, index=False, sep=self.sep, decimal=self.decimal)
             return initial_data
         else:
             index_col = []
@@ -103,7 +101,7 @@ class DataLoader():
 
         """
         This function returns True if DataFrame is MultiIndex or False if is not
-        
+
         """
 
         if isinstance(data.index, pd.MultiIndex):
@@ -169,8 +167,8 @@ class DataLoader():
             if column not in data.columns:
                 continue
             outlier = []
-            data_std = np.std(data[column])
-            data_mean = np.mean(data[column])
+            data_std = np.nanstd(data[column])
+            data_mean = np.nanmean(data[column])
             anomaly_cut_off = data_std * 3
 
             lower_limit = data_mean - anomaly_cut_off
@@ -181,7 +179,7 @@ class DataLoader():
             for value in data[column]:
                 outlier.append(value > upper_limit or value < lower_limit)
 
-            data['STD_DEV_Outlier' + '_'+ column] = outlier
+            data[f'STD_DEV_Outlier_{column}'] = outlier
 
         return data
 
@@ -209,7 +207,7 @@ class DataLoader():
             for value in data[column]:
                 outlier.append(value < q1 - outlier_step or value > q3 + outlier_step)
 
-            data['IQR_Outlier' + '_'+ column] = outlier
+            data[f'IQR_Outlier_{column}'] = outlier
             return data
 
     def fill_in_outliers_with_nan(self, data, method):
@@ -247,7 +245,8 @@ if __name__ == '__main__':
                     outliers_columns=['channel_2','channel_15','channel_17', 'channel_18',
                                    'channel_20','channel_29','channel_43','channel_45',
                                    'channel_52','channel_57','channel_75','channel_89',
-                                   'channel_95','channel_101','channel_111'])
+                                   'channel_95','channel_101','channel_111'],
+                    datetime_duplicated_column_name = ['date_Duplicated'])
     data = dl.get_initial_data()
     data = dl.remove_missing_data(data)
     data = dl.remove_duplicated_columns(data)
