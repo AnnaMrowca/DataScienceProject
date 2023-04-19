@@ -6,20 +6,14 @@ import numpy as np
 
 class DataLoader():
     def __init__(self,
-                 input_data_path: str,
-                 sep: str = ',',
-                 decimal: str = '.',
                  csv_format_path: str = ' ',
-                 coefficient_nulls_removal: int = 50,
+                 coefficient_nulls_removal: int = 80,
                  date_column_name: list = [],
                  datetime_duplicated_column_name: list = [],
                  multi_index_columns: list = [],
                  date_duplicate_column_name: list =[],
                  outliers_columns: list =[],
                  ):
-        self.input_data_path = input_data_path
-        self.sep = sep
-        self.decimal = decimal
         self.csv_format_path = csv_format_path
         self.coefficient_nulls_removal = coefficient_nulls_removal
         self.date_column_name = date_column_name
@@ -28,20 +22,20 @@ class DataLoader():
         self.date_duplicate_column_name = date_duplicate_column_name
         self.outliers_columns = outliers_columns
 
-    def get_initial_data(self):
+    def get_initial_data(self, input_data_path, sep, decimal):
 
         """
          This function returns initial data for further clean-up.
          If dataset is has txt extension, it turns it into csv.
 
         """
-        if self.input_data_path.endswith('txt'):
-            initial_data = pd.read_csv(self.input_data_path)
-            initial_data.to_csv(self.csv_format_path, header=None, index=False, sep=self.sep, decimal=self.decimal)
+        if  input_data_path.endswith('txt'):
+            initial_data = pd.read_csv(input_data_path)
+            initial_data.to_csv(self.csv_format_path, header=None, index=False, sep=sep, decimal=decimal)
             return initial_data
         else:
             index_col = []
-            initial_data = pd.read_csv(self.input_data_path, sep=self.sep, decimal=self.decimal, index_col=index_col)
+            initial_data = pd.read_csv(input_data_path, sep=sep, decimal=decimal, index_col=index_col)
             return initial_data
 
     def remove_missing_data(self, data):
