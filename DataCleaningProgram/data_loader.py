@@ -14,6 +14,7 @@ class DataLoader():
                  date_duplicate_column_name: list =[],
                  outliers_columns: list =[],
                  ):
+
         self.csv_format_path = csv_format_path
         self.coefficient_nulls_removal = coefficient_nulls_removal
         self.date_column_name = date_column_name
@@ -29,6 +30,7 @@ class DataLoader():
          If dataset is has txt extension, it turns it into csv.
 
         """
+
         if  input_data_path.endswith('txt'):
             initial_data = pd.read_csv(input_data_path)
             initial_data.to_csv(self.csv_format_path, header=None, index=False, sep=sep, decimal=decimal)
@@ -231,9 +233,7 @@ class DataLoader():
         return data
 
 if __name__ == '__main__':
-    dl = DataLoader(input_data_path='C:/Users/Ania/Desktop/Nestle Case/X_train_T2.csv',
-                    sep=';',
-                    decimal=',',
+    dl = DataLoader(
                     coefficient_nulls_removal=50,
                     date_column_name=['date'],
                     outliers_columns=['channel_2','channel_15','channel_17', 'channel_18',
@@ -241,7 +241,7 @@ if __name__ == '__main__':
                                    'channel_52','channel_57','channel_75','channel_89',
                                    'channel_95','channel_101','channel_111'],
                     datetime_duplicated_column_name = ['date_Duplicated'])
-    data = dl.get_initial_data()
+    data = dl.get_initial_data(input_data_path='C:/Users/Ania/Desktop/Nestle Case/X_train_T2.csv', sep=';', decimal=',' )
     data = dl.remove_missing_data(data)
     data = dl.remove_duplicated_columns(data)
     data = dl.delete_duplicated_rows(data)
