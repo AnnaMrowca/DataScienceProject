@@ -7,7 +7,7 @@ import numpy as np
 class DataLoader():
     def __init__(self,
                  csv_format_path: str = ' ',
-                 coefficient_nulls_removal: int = 50,
+                 coefficient_nulls_removal: int = 80,
                  date_column_name: list = [],
                  datetime_duplicated_column_name: list = [],
                  multi_index_columns: list = [],
@@ -31,7 +31,7 @@ class DataLoader():
 
         """
 
-        if input_data_path.endswith('txt'):
+        if  input_data_path.endswith('txt'):
             initial_data = pd.read_csv(input_data_path)
             initial_data.to_csv(self.csv_format_path, header=None, index=False, sep=sep, decimal=decimal)
             return initial_data
